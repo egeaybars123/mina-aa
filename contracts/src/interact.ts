@@ -1,7 +1,6 @@
 import { equal } from "node:assert"
-import { AccountUpdate, Bool, Mina, PrivateKey, UInt64, UInt8, Signature, Field, PublicKey } from "o1js"
+import { AccountUpdate, Mina, PrivateKey, UInt64, UInt8, Signature, Field, PublicKey, } from "o1js"
 import { SmartMinaAccount } from './SmartMinaAccount.js';
-import { Field3 } from 'o1js/dist/node/lib/provable/gadgets/foreign-field.js';
 
 const localChain = await Mina.LocalBlockchain({
   proofsEnabled: false,
@@ -13,11 +12,7 @@ const fee = 1e8
 
 const [deployer, issuer,] = localChain.testAccounts
 const contract = PrivateKey.randomKeypair()
-const admin = PrivateKey.randomKeypair()
-
-
 const account = new SmartMinaAccount(contract.publicKey)
-
 
 console.log("Deploying token contract...")
 
@@ -25,12 +20,12 @@ const deployTx = await Mina.transaction({
   sender: deployer,
   fee,
 }, async () => {
-  AccountUpdate.fundNewAccount(deployer, 1)
+  AccountUpdate.fundNewAccount(deployer)
   await account.deploy()
 })
 
 await deployTx.prove()
-deployTx.sign([deployer.key])
+deployTx.sign([deployer.key, contract.privateKey])
 await deployTx.send()
 console.log("Deploy tx confirmed");
 
