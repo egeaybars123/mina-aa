@@ -1,3 +1,3 @@
-import { Add } from './Add.js';
+import { SmartMinaAccount } from './SmartMinaAccount.js';
 
-export { Add };
+export { SmartMinaAccount };

@@ -1,26 +1,22 @@
-import { AccountUpdate, Field, Mina, PrivateKey, PublicKey } from 'o1js';
-import { Add } from './Add';
-
 /*
- * This file specifies how to test the `Add` example smart contract. It is safe to delete this file and replace
- * with your own tests.
- *
- * See https://docs.minaprotocol.com/zkapps for more info.
- */
+import { AccountUpdate, Field, ForeignCurve, Mina, PrivateKey, PublicKey } from 'o1js';
+import { Field3 } from 'o1js/dist/node/lib/provable/gadgets/foreign-field';
+import { SmartMinaAccount } from './SmartMinaAccount.js';
+
 
 let proofsEnabled = false;
 
-describe('Add', () => {
+describe('Smart Mina Account', () => {
   let deployerAccount: Mina.TestPublicKey,
     deployerKey: PrivateKey,
     senderAccount: Mina.TestPublicKey,
     senderKey: PrivateKey,
     zkAppAddress: PublicKey,
     zkAppPrivateKey: PrivateKey,
-    zkApp: Add;
+    zkApp: SmartMinaAccount;
 
   beforeAll(async () => {
-    if (proofsEnabled) await Add.compile();
+    if (proofsEnabled) await SmartMinaAccount.compile();
   });
 
   beforeEach(async () => {
@@ -32,7 +28,7 @@ describe('Add', () => {
 
     zkAppPrivateKey = PrivateKey.random();
     zkAppAddress = zkAppPrivateKey.toPublicKey();
-    zkApp = new Add(zkAppAddress);
+    zkApp = new SmartMinaAccount(zkAppAddress);
   });
 
   async function localDeploy() {
@@ -45,12 +41,15 @@ describe('Add', () => {
     await txn.sign([deployerKey, zkAppPrivateKey]).send();
   }
 
-  it('generates and deploys the `Add` smart contract', async () => {
+  it('generates and deploys the `SmartMinaAccount` smart contract & publicKey is equal to (0,0)', async () => {
     await localDeploy();
-    const num = zkApp.num.get();
-    expect(num).toEqual(Field(1));
+    const publicKeyX: Field3 = zkApp.publicKeyX.get();
+    const publicKeyY: Field3 = zkApp.publicKeyY.get();
+    expect(publicKeyX).toEqual([Field(0), Field(0), Field(0)])
+    expect(publicKeyY).toEqual([Field(0), Field(0), Field(0)])
   });
 
+  /*
   it('correctly updates the num state on the `Add` smart contract', async () => {
     await localDeploy();
 
@@ -64,4 +63,6 @@ describe('Add', () => {
     const updatedNum = zkApp.num.get();
     expect(updatedNum).toEqual(Field(3));
   });
+  
 });
+*/
