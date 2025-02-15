@@ -1,12 +1,13 @@
 import {
   Field, SmartContract, state, State, method,
   createEcdsa, Crypto, createForeignCurve, Bytes,
-
+  Bool, Hash
 } from 'o1js';
 
 class Secp256r1 extends createForeignCurve(Crypto.CurveParams.Secp256r1) { }
 class EcdsaP256 extends createEcdsa(Secp256r1) { }
 class Bytes32 extends Bytes(32) { }
+//class Bytes40 extends Bytes(40) { } //This part will be changed as we progress through our passkey signature verification.
 
 type Field3 = [Field, Field, Field];
 const x_coordinate: Field3 = [Field(34139339299174658436352332n), Field(6401723155167912230812378n), Field(938468427987341925535700n)]
@@ -33,14 +34,34 @@ export class SmartMinaAccount extends SmartContract {
     this.pubKey_Y3.set(y_coordinate[2])
   }
 
-  @method async verifySignature(message: Bytes32, signature: EcdsaP256) {
+  //Question: we have message as Bytes32 type, but we can pass in 33 bytes long Bytes as a parameter. how does that work?
+  @method.returns(Bool) async verifySignature(message: Bytes32, signature: EcdsaP256): Promise<Bool> {
     const pubKey_X1 = this.pubKey_X1.get();
+    this.pubKey_X1.requireEquals(pubKey_X1);
     const pubKey_X2 = this.pubKey_X2.get();
+    this.pubKey_X2.requireEquals(pubKey_X2);
     const pubKey_X3 = this.pubKey_X3.get();
+    this.pubKey_X3.requireEquals(pubKey_X3);
 
     const pubKey_Y1 = this.pubKey_Y1.get();
+    this.pubKey_Y1.requireEquals(pubKey_Y1);
     const pubKey_Y2 = this.pubKey_Y2.get();
+    this.pubKey_Y2.requireEquals(pubKey_Y2);
     const pubKey_Y3 = this.pubKey_Y3.get();
+    this.pubKey_Y3.requireEquals(pubKey_Y3);
+
+    const nonce = this.nonce.get();
+    this.nonce.requireEquals(nonce);
+
+    const nonce_bytes = Bytes.fromString(nonce.toString()) //Not tested, it will be checked with a security expert.
+    const nonceArray = nonce_bytes.toBytes()
+    console.log("Nonce Array zkApp: ", nonceArray)
+    const message_bytes = message.toBytes()
+    console.log("message zkApp: ", message_bytes)
+    const newMessage = new Uint8Array(message_bytes.length + nonceArray.length);
+    newMessage.set(message_bytes, 0); // Copy combinedArray
+    newMessage.set(nonceArray, message_bytes.length); // Append nonceArray
+    console.log("zkApp newMessage: ", newMessage)
 
     const xCoordinate: Field3 = [pubKey_X1, pubKey_X2, pubKey_X3];
     const yCoordinate: Field3 = [pubKey_Y1, pubKey_Y2, pubKey_Y3];
@@ -50,27 +71,9 @@ export class SmartMinaAccount extends SmartContract {
       y: yCoordinate
     });
 
-    const result = signature.verify(message, pubKey);
-    result.assertTrue("signature verified");
+    const result = signature.verify(Bytes.from(newMessage), pubKey);
+    //result.assertTrue("signature verified");
+    return Bool(result);
   }
-
-  /*
-    const hexString = "82EB3D8D0FF886BF050869F000CBDD2649A67C48E1F68E83BEDC79B6CFBFC0CF";
-    const bytes = Bytes32.fromHex(hexString);
-    const fields = bytes.toFields();
-    
-    this.pubKey_X1.set(fields[0]);
-    this.pubKey_X2.set(fields[1]);
-    this.pubKey_X3.set(fields[2]);
-    */
-
-  /*
-  @method async createAccount(accountPublicKey: ForeignCurve) {
-    this.publicKeyX.requireEquals([Field(0), Field(0), Field(0)]);
-    this.publicKeyY.requireEquals([Field(0), Field(0), Field(0)]);
-    
-    this.publicKeyX.set(accountPublicKey.x.value);
-    this.publicKeyY.set(accountPublicKey.y.value);
-  }
-  */
 }
+

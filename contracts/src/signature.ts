@@ -4,8 +4,9 @@ import {
     Crypto,
     createForeignCurve,
     Bytes,
+    Hash,
+    Gadgets
 } from 'o1js';
-import { Field3 } from 'o1js/dist/node/lib/provable/gadgets/foreign-field.js';
 
 class Secp256r1 extends createForeignCurve(Crypto.CurveParams.Secp256r1) { }
 class Ecdsa extends createEcdsa(Secp256r1) { }
@@ -15,50 +16,61 @@ let message = Bytes32.random();
 let privateKey = Secp256r1.Scalar.random();
 let publicKey = Secp256r1.generator.scale(privateKey);
 
-let signature = Ecdsa.sign(message.toBytes(), privateKey.toBigInt());
+console.log("Public Key: ", publicKey.toBigint())
+console.log("Private key: ", privateKey.toBigInt())
 
-const result = signature.verify(message, publicKey);
+// Convert the message to Uint8Array
+const messageArray = message.toBytes(); // Assuming message is of type Bytes32
 
-console.log("Signature verification: ", result.toString())
+// Create the additional Uint8Array you want to append
+const additionalData = new Uint8Array([1, 2, 3, 4]); // Replace with your actual data
+const combinedArray = new Uint8Array(messageArray.length + additionalData.length);
 
-//const y_coordinate = calculateYCoordinate(publicKey.x.toBigInt())
-//console.log("Y coordinate: ", y_coordinate)
-console.log("Y coordinate: ", publicKey.y.toBigInt())
-//const field3: Field3 = [publicKey.x.toFields()[0], publicKey.x.toFields()[1], publicKey.x.toFields()[2]]
-//const test = toBigint(field3)
-//console.log("Test", test)
+combinedArray.set(messageArray, 0);
+combinedArray.set(additionalData, messageArray.length);
 
-console.log("Test p256 private key: ", privateKey.toBigInt())
-console.log("p256 public key: ", publicKey.toBigint())
+const new_message = Bytes.from(combinedArray); // Create Bytes from combined array
 
-console.log("X coordinate: ", publicKey.x.toFields().toString())
-console.log("Y coordinate: ", publicKey.y.toFields().toString())
+console.log()
 
-function calculateYCoordinate(x: bigint): bigint {
-    // y² = x³ + ax + b where a = -3 and b is the curve parameter for secp256r1
-    const x2 = Secp256r1.Field.Bigint.mul(x, x)
-    const x3 = Secp256r1.Field.Bigint.mul(x2, x)
+// Now you can use combinedArray for signing or hashing
+let signature = Ecdsa.sign(combinedArray, privateKey.toBigInt());
 
-    const a = Crypto.CurveParams.Secp256r1.a
-    const ax = Secp256r1.Field.Bigint.mul(a, x);  // ax
-    const b = Crypto.CurveParams.Secp256r1.b;
-    const rhs = Secp256r1.Field.Bigint.add(x3, Secp256r1.Field.Bigint.add(ax, b)); // x³ + ax + b
+const result = signature.verify(new_message, publicKey);
 
-    // Calculate square root to get y
-    const y = Secp256r1.Field.Bigint.sqrt(rhs);
-    if (y === undefined) throw new Error('No square root exists - point is not on curve');
-    return y;
-}
+console.log("Signature verification: ", result.toString());
 
+const hash = Gadgets.SHA256.hash(combinedArray);
 
-function toBigint(field3: Field3) {
-    return combine(toBigint3(field3))
-}
+// Convert nonce to Bytes
+const nonce = Field(32).toString();
+const nonce_bytes = Bytes.fromString(nonce);
 
-function combine([x0, x1, x2]: [bigint, bigint, bigint]) {
-    return x0 + (x1 << 88n) + (x2 << 166n);
-}
+// Convert nonce_bytes to Uint8Array
+const nonceArray = nonce_bytes.toBytes(); // Convert nonce_bytes to Uint8Array
 
-function toBigint3(x: Field3): [bigint, bigint, bigint] {
-    return [x[0].toBigInt(), x[1].toBigInt(), x[2].toBigInt()];
+// Create a new Uint8Array to hold the combined message and nonce
+const finalCombinedArray = new Uint8Array(combinedArray.length + nonceArray.length);
+
+// Copy the combinedArray and nonceArray into the final array
+finalCombinedArray.set(combinedArray, 0); // Copy combinedArray
+finalCombinedArray.set(nonceArray, combinedArray.length); // Append nonceArray
+
+console.log("Final combined array: ", finalCombinedArray);
+
+// Convert finalCombinedArray to hexadecimal
+const hexString = uint8ArrayToHex(finalCombinedArray);
+console.log("Hex: ", hexString);
+
+// Now you can use finalCombinedArray for signing or hashing
+let finalSignature = Ecdsa.sign(finalCombinedArray, privateKey.toBigInt());
+
+const finalResult = finalSignature.verify(Bytes.from(finalCombinedArray), publicKey);
+
+console.log("Final Signature verification: ", finalResult.toString());
+
+function uint8ArrayToHex(uint8Array: Uint8Array) {
+    return Array.from(uint8Array)
+        .map(byte => byte.toString(16).padStart(2, '0')) // Convert each byte to hex and pad with zero if needed
+        .join(''); // Join all hex strings into a single string
 }
