@@ -1,7 +1,7 @@
 import {
   Field, SmartContract, state, State, method,
   createEcdsa, Crypto, createForeignCurve, Bytes,
-  Bool, Hash
+  Bool, Permissions, TransactionVersion, PublicKey, UInt64
 } from 'o1js';
 
 class Secp256r1 extends createForeignCurve(Crypto.CurveParams.Secp256r1) { }
@@ -23,7 +23,29 @@ export class SmartMinaAccount extends SmartContract {
   @state(Field) pubKey_Y3 = State<Field>();
   @state(Field) nonce = State<Field>();
 
-  init() {
+
+  async deploy() {
+    await super.deploy();
+    this.account.permissions.set({
+      ...Permissions.default(),
+      setDelegate: Permissions.proof(),
+      setPermissions: Permissions.proof(),
+      setVerificationKey: {
+        auth: Permissions.proof(),
+        txnVersion: TransactionVersion.current(),
+      },
+      setZkappUri: Permissions.proof(),
+      setTokenSymbol: Permissions.proof(),
+      incrementNonce: Permissions.proof(),
+      setVotingFor: Permissions.proof(),
+      setTiming: Permissions.proof(),
+    });
+  }
+
+  @method async init() {
+    //this.account.provedState.getAndRequireEquals();
+    //this.account.provedState.get().assertFalse();
+
     super.init();
     this.pubKey_X1.set(x_coordinate[0])
     this.pubKey_X2.set(x_coordinate[1])
@@ -32,6 +54,17 @@ export class SmartMinaAccount extends SmartContract {
     this.pubKey_Y1.set(y_coordinate[0])
     this.pubKey_Y2.set(y_coordinate[1])
     this.pubKey_Y3.set(y_coordinate[2])
+  }
+
+  @method async transferFunds(to: PublicKey, amount: UInt64, message: Bytes32, signature: EcdsaP256) {
+    // Ensure the zkApp has permission to transfer funds
+    //this.account.provedState.getAndRequireEquals();
+    //this.account.provedState.get().assertFalse();
+
+    const verification = await this.verifySignature(message, signature);
+    verification.assertTrue();
+
+    this.send({ to, amount })
   }
 
   //Question: we have message as Bytes32 type, but we can pass in 33 bytes long Bytes as a parameter. how does that work?
@@ -55,13 +88,13 @@ export class SmartMinaAccount extends SmartContract {
 
     const nonce_bytes = Bytes.fromString(nonce.toString()) //Not tested, it will be checked with a security expert.
     const nonceArray = nonce_bytes.toBytes()
-    console.log("Nonce Array zkApp: ", nonceArray)
+    //console.log("Nonce Array zkApp: ", nonceArray)
     const message_bytes = message.toBytes()
-    console.log("message zkApp: ", message_bytes)
+    //console.log("message zkApp: ", message_bytes)
     const newMessage = new Uint8Array(message_bytes.length + nonceArray.length);
     newMessage.set(message_bytes, 0); // Copy combinedArray
     newMessage.set(nonceArray, message_bytes.length); // Append nonceArray
-    console.log("zkApp newMessage: ", newMessage)
+    //console.log("zkApp newMessage: ", newMessage)
 
     const xCoordinate: Field3 = [pubKey_X1, pubKey_X2, pubKey_X3];
     const yCoordinate: Field3 = [pubKey_Y1, pubKey_Y2, pubKey_Y3];
@@ -75,5 +108,6 @@ export class SmartMinaAccount extends SmartContract {
     //result.assertTrue("signature verified");
     return Bool(result);
   }
+
 }
 
